@@ -4,10 +4,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # --- Page Configuration ---
-st.set_page_config(page_title="Symphony Campaign Performance", layout="wide")
+st.set_page_config(page_title="Campaign Year Comparison", layout="wide")
 
-st.title("🎻 Symphony Orchestra: Outbound Campaign Dashboard")
-st.markdown("### Tracking conversion efficiency for 2027 and beyond")
+st.title("🎻 Symphony Campaign Comparison Dashboard")
+st.markdown("### Benchmarking performance across campaign years")
 
 # --- Helper Function to Load & Clean Data ---
 @st.cache_data
@@ -18,8 +18,7 @@ def load_data(file):
     df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
     df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
     
-    # Map Contacts Count based on 'previous_step_at_closure'
-    # Adjust this map if your CRM terminology changes
+    # Map Contacts Count
     contact_map = {
         'TKT - To start': 0,
         'TKT - 1st contact complete': 1,
@@ -28,119 +27,147 @@ def load_data(file):
         'TKT - 4th contact complete': 4,
         'TKT - 5th contact complete': 5
     }
-    # Use a regex or map to handle variations if needed, defaulting to map for now
     df['contact_count'] = df['previous_step_at_closure'].map(contact_map).fillna(0)
+    
+    # Ensure campaign_year is treated as a string/category for plotting colors
+    df['campaign_year'] = df['campaign_year'].astype(str)
     
     return df
 
 # --- Sidebar: Data Upload & Filters ---
 st.sidebar.header("1. Upload Data")
-uploaded_file = st.sidebar.file_uploader("Upload your daily campaign CSV", type=['csv', 'xlsx'])
+uploaded_file = st.sidebar.file_uploader("Upload your campaign data (CSV/Excel)", type=['csv', 'xlsx'])
 
 if uploaded_file is not None:
     try:
-        # Determine file type
+        # Load Data
         if uploaded_file.name.endswith('.csv'):
             df = load_data(uploaded_file)
         else:
+            # Simple excel loader logic for demo
             df = pd.read_excel(uploaded_file)
-            # Re-apply cleaning steps if excel (copy logic from load_data or simplify)
             df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
             df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
             contact_map = {'TKT - To start': 0, 'TKT - 1st contact complete': 1, 
                            'TKT - 2nd contact complete': 2, 'TKT - 3rd contact complete': 3}
             df['contact_count'] = df['previous_step_at_closure'].map(contact_map).fillna(0)
+            df['campaign_year'] = df['campaign_year'].astype(str)
 
-        st.sidebar.header("2. Filters")
+        st.sidebar.header("2. Comparison Settings")
         
-        # Filter: Campaign Year
-        years = sorted(df['campaign_year'].unique())
-        selected_year = st.sidebar.multiselect("Select Campaign Year", years, default=years)
+        # Filter: Campaign Year (Select at least 2 for good comparison)
+        all_years = sorted(df['campaign_year'].unique())
+        selected_years = st.sidebar.multiselect("Select Years to Compare", all_years, default=all_years)
         
-        # Filter: Campaign Series
-        series_list = sorted(df['campaign_series'].unique())
-        selected_series = st.sidebar.multiselect("Select Series", series_list, default=series_list)
+        # Filter: Series
+        all_series = sorted(df['campaign_series'].unique())
+        selected_series = st.sidebar.multiselect("Filter by Series (Optional)", all_series, default=all_series)
         
         # Apply Filters
         filtered_df = df[
-            (df['campaign_year'].isin(selected_year)) & 
+            (df['campaign_year'].isin(selected_years)) & 
             (df['campaign_series'].isin(selected_series))
         ]
         
-        # --- Main Dashboard Area ---
-        
-        # Row 1: Top Level Metrics
-        st.markdown("---")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        total_sales = len(filtered_df)
-        avg_contacts = filtered_df['contact_count'].mean()
-        avg_days = filtered_df['days_to_plan_close'].mean()
-        pct_zero_contact = (len(filtered_df[filtered_df['contact_count'] == 0]) / total_sales * 100) if total_sales > 0 else 0
-        
-        col1.metric("Total Sales Converted", f"{total_sales}")
-        col2.metric("Avg Contacts per Sale", f"{avg_contacts:.2f}")
-        col3.metric("Avg Days to Convert", f"{avg_days:.1f} days")
-        col4.metric("% Zero-Touch Sales", f"{pct_zero_contact:.1f}%")
-        
-        # Row 2: Charts
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.subheader("Contacts Required to Convert")
-            # Group by contact count
-            contact_dist = filtered_df['contact_count'].value_counts().reset_index()
-            contact_dist.columns = ['Contacts', 'Count']
-            contact_dist = contact_dist.sort_values('Contacts')
+        if len(filtered_df) == 0:
+            st.warning("No data found for the selected filters.")
+        else:
+            # --- Main Dashboard Area ---
+
+            # 1. Comparative KPI Table
+            st.subheader("📊 Year-over-Year KPI Comparison")
             
-            fig_contacts = px.bar(
-                contact_dist, x='Contacts', y='Count', 
-                text='Count', 
-                title="Distribution of Contacts per Sale",
-                color='Count', color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig_contacts, use_container_width=True)
-            
-        with c2:
-            st.subheader("Conversion Speed (Days to Close)")
-            fig_days = px.histogram(
-                filtered_df, x='days_to_plan_close', nbins=20,
-                title="Histogram: Days from First Contact to Sale",
-                color_discrete_sequence=['green']
-            )
-            st.plotly_chart(fig_days, use_container_width=True)
-
-        # Row 3: Time Series & Series Breakdown
-        c3, c4 = st.columns(2)
-
-        with c3:
-            st.subheader("Sales Over Time")
-            # Resample by week or day
-            sales_over_time = filtered_df.set_index('plan_close_dt').resample('W').size().reset_index(name='Sales')
-            fig_time = px.line(sales_over_time, x='plan_close_dt', y='Sales', title="Weekly Sales Volume", markers=True)
-            st.plotly_chart(fig_time, use_container_width=True)
-
-        with c4:
-            st.subheader("Performance by Series")
-            series_metrics = filtered_df.groupby('campaign_series').agg(
+            # Group by year to get summary stats
+            kpi_df = filtered_df.groupby('campaign_year').agg(
+                Total_Sales=('customer_no', 'count'),
                 Avg_Contacts=('contact_count', 'mean'),
-                Sales=('customer_no', 'count')
-            ).reset_index()
+                Avg_Days_to_Close=('days_to_plan_close', 'mean'),
+                Median_Days_to_Close=('days_to_plan_close', 'median')
+            )
+            
+            # Calculate % Zero Touch (Sales with 0 contacts)
+            zero_touch = filtered_df[filtered_df['contact_count'] == 0].groupby('campaign_year')['customer_no'].count()
+            kpi_df['Zero_Touch_Count'] = zero_touch
+            kpi_df['%_Zero_Touch'] = (kpi_df['Zero_Touch_Count'] / kpi_df['Total_Sales'] * 100).fillna(0)
+
+            # Format for display
+            display_kpi = kpi_df[['Total_Sales', 'Avg_Contacts', 'Avg_Days_to_Close', '%_Zero_Touch']].reset_index()
+            display_kpi = display_kpi.rename(columns={
+                'campaign_year': 'Year',
+                'Total_Sales': 'Total Sales', 
+                'Avg_Contacts': 'Avg Contacts', 
+                'Avg_Days_to_Close': 'Avg Days to Close',
+                '%_Zero_Touch': '% Zero-Touch Sales'
+            })
+            
+            # Show as a styled table
+            st.dataframe(
+                display_kpi.style.format({
+                    'Avg Contacts': '{:.2f}',
+                    'Avg Days to Close': '{:.1f}',
+                    '% Zero-Touch Sales': '{:.1f}%'
+                }), 
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # 2. Charts Row
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Contacts Distribution by Year")
+                # Prepare data for grouped bar chart
+                contact_counts = filtered_df.groupby(['campaign_year', 'contact_count']).size().reset_index(name='count')
+                
+                # Calculate percentages within each year for fairer comparison
+                contact_counts['percentage'] = contact_counts.groupby('campaign_year')['count'].transform(lambda x: x / x.sum() * 100)
+                
+                fig_contacts = px.bar(
+                    contact_counts, 
+                    x='contact_count', 
+                    y='percentage', 
+                    color='campaign_year',
+                    barmode='group',
+                    title="Distribution of Contacts (Percentage of Year's Sales)",
+                    labels={'contact_count': 'Number of Contacts', 'percentage': '% of Sales'},
+                    text_auto='.1f'
+                )
+                fig_contacts.update_layout(xaxis=dict(tickmode='linear', dtick=1))
+                st.plotly_chart(fig_contacts, use_container_width=True)
+
+            with col2:
+                st.subheader("Speed of Conversion by Year")
+                # Box plot is excellent for comparing distributions
+                fig_box = px.box(
+                    filtered_df, 
+                    x='campaign_year', 
+                    y='days_to_plan_close', 
+                    color='campaign_year',
+                    title="Days to Close Distribution (Box Plot)",
+                    labels={'days_to_plan_close': 'Days', 'campaign_year': 'Year'}
+                )
+                st.plotly_chart(fig_box, use_container_width=True)
+
+            # 3. Series Performance Comparison
+            st.markdown("---")
+            st.subheader("Series Performance: Year vs Year")
+            
+            # Pivot data to compare series side-by-side
+            series_stats = filtered_df.groupby(['campaign_series', 'campaign_year'])['contact_count'].mean().reset_index()
             
             fig_series = px.bar(
-                series_metrics, x='campaign_series', y='Avg_Contacts',
-                title="Avg Contacts by Series (Bar Height) & Volume (Color)",
-                color='Sales', hover_data=['Sales']
+                series_stats,
+                x='campaign_series',
+                y='contact_count',
+                color='campaign_year',
+                barmode='group',
+                title="Average Contacts per Series by Year",
+                labels={'contact_count': 'Avg Contacts Needed', 'campaign_series': 'Series'}
             )
             st.plotly_chart(fig_series, use_container_width=True)
 
-        # Raw Data View
-        with st.expander("View Raw Data"):
-            st.dataframe(filtered_df)
-
     except Exception as e:
-        st.error(f"Error processing file. Please ensure the columns match the 2025/2026 format. Error: {e}")
-
+        st.error(f"An error occurred: {e}")
 else:
-    st.info("👈 Please upload a CSV file from the sidebar to begin.")
+    st.info("👈 Upload your data file to start the comparison.")
