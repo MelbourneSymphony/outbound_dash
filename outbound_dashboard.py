@@ -119,10 +119,10 @@ if uploaded_file is not None:
             
             # Prepare Daily Aggregation
             daily_sales = filtered_df.groupby(['campaign_year', 'plan_close_dt']).size().reset_index(name='daily_sales')
-            daily_sales['close_date'] = pd.to_datetime(daily_sales['close_date'])
+            daily_sales['plan_close_dt'] = pd.to_datetime(daily_sales['plan_close_dt'])
             
             # Sort for cumulative sum
-            daily_sales = daily_sales.sort_values(['campaign_year', 'close_date'])
+            daily_sales = daily_sales.sort_values(['campaign_year', 'plan_close_dt'])
             daily_sales['cumulative_sales'] = daily_sales.groupby('campaign_year')['daily_sales'].cumsum()
 
             # Comparison Toggle
@@ -134,7 +134,7 @@ if uploaded_file is not None:
             if align_dates:
                 # Create a dummy year (e.g., 2020) to overlay plots
                 # Logic: Keep Month/Day, replace Year. Handle Leap years if needed (ignoring for simplicity)
-                daily_sales['plot_date'] = daily_sales['close_date'].apply(lambda x: x.replace(year=2020))
+                daily_sales['plot_date'] = daily_sales['plan_close_dt'].apply(lambda x: x.replace(year=2020))
                 x_axis_col = 'plot_date'
                 x_label = 'Date (Month-Day)'
                 title_suffix = "(Aligned by Month-Day)"
