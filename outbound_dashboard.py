@@ -139,7 +139,7 @@ if uploaded_file is not None:
                 x_label = 'Date (Month-Day)'
                 title_suffix = "(Aligned by Month-Day)"
             else:
-                x_axis_col = 'close_date'
+                x_axis_col = 'plan_close_dt'
                 x_label = 'Date'
                 title_suffix = "(Actual Dates)"
 
