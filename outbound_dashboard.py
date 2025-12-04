@@ -118,7 +118,7 @@ if uploaded_file is not None:
             st.subheader("📈 Sales per Day")
             
             # Prepare Daily Aggregation
-            daily_sales = filtered_df.groupby(['campaign_year', 'close_date']).size().reset_index(name='daily_sales')
+            daily_sales = filtered_df.groupby(['campaign_year', 'plan_close_date']).size().reset_index(name='daily_sales')
             daily_sales['close_date'] = pd.to_datetime(daily_sales['close_date'])
             
             # Sort for cumulative sum
