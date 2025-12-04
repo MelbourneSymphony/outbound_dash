@@ -6,14 +6,17 @@ import plotly.graph_objects as go
 # --- Page Configuration ---
 st.set_page_config(page_title="Campaign Year Comparison", layout="wide")
 
-st.title("🎻 Symphony Campaign Comparison Dashboard")
-st.markdown("### Benchmarking performance across campaign years")
+st.title("🎺🥁📯🎶 Outbound Campaign Comparison Dashboard")
+st.markdown("### Performance across campaign years")
 
 # --- Helper Function to Load & Clean Data ---
 @st.cache_data
 def load_data(file):
     df = pd.read_csv(file)
     
+# Extract just the date for daily aggregation
+    df['close_date'] = df['plan_close_dt'].dt.date
+
     # Date Conversion
     df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
     df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
@@ -110,6 +113,68 @@ if uploaded_file is not None:
                 use_container_width=True,
                 hide_index=True
             )
+
+            st.markdown("---")
+            st.subheader("📈 Sales per Day")
+            
+            # Prepare Daily Aggregation
+            daily_sales = filtered_df.groupby(['campaign_year', 'close_date']).size().reset_index(name='daily_sales')
+            daily_sales['close_date'] = pd.to_datetime(daily_sales['close_date'])
+            
+            # Sort for cumulative sum
+            daily_sales = daily_sales.sort_values(['campaign_year', 'close_date'])
+            daily_sales['cumulative_sales'] = daily_sales.groupby('campaign_year')['daily_sales'].cumsum()
+
+            # Comparison Toggle
+            col_toggle, _ = st.columns([1, 3])
+            with col_toggle:
+                align_dates = st.checkbox("Align Dates for Overlay Comparison", value=False, 
+                                          help="Overlays different years on a shared timeline (Month-Day) to compare seasonality.")
+
+            if align_dates:
+                # Create a dummy year (e.g., 2020) to overlay plots
+                # Logic: Keep Month/Day, replace Year. Handle Leap years if needed (ignoring for simplicity)
+                daily_sales['plot_date'] = daily_sales['close_date'].apply(lambda x: x.replace(year=2020))
+                x_axis_col = 'plot_date'
+                x_label = 'Date (Month-Day)'
+                title_suffix = "(Aligned by Month-Day)"
+            else:
+                x_axis_col = 'close_date'
+                x_label = 'Date'
+                title_suffix = "(Actual Dates)"
+
+            tab1, tab2 = st.tabs(["Daily Volume", "Cumulative Performance"])
+
+            with tab1:
+                fig_daily = px.line(
+                    daily_sales, 
+                    x=x_axis_col, 
+                    y='daily_sales', 
+                    color='campaign_year',
+                    markers=True,
+                    title=f"Total Sales per Day {title_suffix}",
+                    labels={x_axis_col: x_label, 'daily_sales': 'Number of Sales', 'campaign_year': 'Year'}
+                )
+                if align_dates:
+                    fig_daily.update_xaxes(tickformat="%b %d") # Format as Month-Day
+                st.plotly_chart(fig_daily, use_container_width=True)
+                
+            with tab2:
+                fig_cum = px.line(
+                    daily_sales, 
+                    x=x_axis_col, 
+                    y='cumulative_sales', 
+                    color='campaign_year',
+                    title=f"Cumulative Sales Progression {title_suffix}",
+                    labels={x_axis_col: x_label, 'cumulative_sales': 'Total Sales to Date', 'campaign_year': 'Year'}
+                )
+                if align_dates:
+                    fig_cum.update_xaxes(tickformat="%b %d")
+                st.plotly_chart(fig_cum, use_container_width=True)
+
+
+
+
 
             # 2. Charts Row
             st.markdown("---")
