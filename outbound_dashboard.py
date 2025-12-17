@@ -14,14 +14,19 @@ st.markdown("### Performance across campaign years")
 def load_data(file):
     df = pd.read_csv(file)
     
-# Extract just the date for daily aggregation
-    df['close_date'] = df['plan_close_dt'].dt.date
-
-    # Date Conversion
+    # 1. Date Conversion (Must happen before .dt accessor)
     df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
     df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
+
+    # 2. Extract just the date for daily aggregation
+    # This must be done AFTER converting to datetime
+    df['close_date'] = df['plan_close_dt'].dt.date
+
+    # 3. CRITICAL FIX: Ensure days_to_plan_close is numeric.
+    # This prevents the '<' not supported error if any value is a string.
+    df['days_to_plan_close'] = pd.to_numeric(df['days_to_plan_close'], errors='coerce')
     
-    # Map Contacts Count
+    # 4. Map Contacts Count (Existing Logic)
     contact_map = {
         'TKT - To start': 0,
         'TKT - 1st contact complete': 1,
@@ -32,7 +37,7 @@ def load_data(file):
     }
     df['contact_count'] = df['previous_step_at_closure'].map(contact_map).fillna(0)
     
-    # Ensure campaign_year is treated as a string/category for plotting colors
+    # 5. Ensure campaign_year is treated as a string/category
     df['campaign_year'] = df['campaign_year'].astype(str)
     
     return df
