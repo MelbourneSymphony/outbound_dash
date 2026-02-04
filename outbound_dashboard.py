@@ -14,19 +14,13 @@ st.markdown("### Performance across campaign years")
 def load_data(file):
     df = pd.read_csv(file)
     
-    # 1. Date Conversion (Must happen before .dt accessor)
+    # Cleaning & Type Conversion
     df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
     df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
-
-    # 2. Extract just the date for daily aggregation
-    # This must be done AFTER converting to datetime
     df['close_date'] = df['plan_close_dt'].dt.date
-
-    # 3. CRITICAL FIX: Ensure days_to_plan_close is numeric.
-    # This prevents the '<' not supported error if any value is a string.
     df['days_to_plan_close'] = pd.to_numeric(df['days_to_plan_close'], errors='coerce')
     
-    # 4. Map Contacts Count (Existing Logic)
+    # 4. Map Contacts Count 
     contact_map = {
         'TKT - To start': 0,
         'TKT - 1st contact complete': 1,
@@ -64,11 +58,11 @@ if uploaded_file is not None:
         st.sidebar.header("2. Comparison Settings")
         
         # Filter: Campaign Year (Select at least 2 for good comparison)
-        all_years = sorted(df['campaign_year'].unique())
+        all_years = sorted(df['campaign_year'].unique().astype(str))
         selected_years = st.sidebar.multiselect("Select Years to Compare", all_years, default=all_years)
         
         # Filter: Series
-        all_series = sorted(df['campaign_series'].unique())
+        all_series = sorted(df['campaign_series'].dropna().unique().astype(str))
         selected_series = st.sidebar.multiselect("Filter by Series (Optional)", all_series, default=all_series)
         
         # Apply Filters
