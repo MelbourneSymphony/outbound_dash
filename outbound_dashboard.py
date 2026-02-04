@@ -130,31 +130,34 @@ if uploaded_file is not None:
                 align_dates = st.checkbox("Align Dates for Overlay Comparison", value=False, 
                                           help="Overlays different years on a shared timeline (Month-Day) to compare seasonality.")
 
+            # 1. Calculate the start date for each campaign
+            campaign_starts = daily_sales.groupby('campaign_year')['plan_close_dt'].transform('min')
+
+        # 2. Calculate "Day of Campaign" (integer)
+            daily_sales['day_of_campaign'] = (daily_sales['plan_close_dt'] - campaign_starts).dt.days
+
             if align_dates:
-                # Create a dummy year (e.g., 2020) to overlay plots
-                # Logic: Keep Month/Day, replace Year. Handle Leap years if needed (ignoring for simplicity)
-                daily_sales['plot_date'] = daily_sales['plan_close_dt'].apply(
-                lambda x: x.replace(year=2021) if x.month < 7 else x.replace(year=2020))
-                x_axis_col = 'plot_date'
-                x_label = 'Date (Month-Day)'
-                title_suffix = "(Aligned by Month-Day)"
+                x_axis_col = 'day_of_campaign'
+                x_label = 'Days Since Campaign Launch'
+                title_suffix = "(Aligned by Launch Day)"
             else:
                 x_axis_col = 'plan_close_dt'
                 x_label = 'Date'
-                title_suffix = "(Actual Dates)"
+            title_suffix = "(Actual Dates)"
 
             tab1, tab2 = st.tabs(["Daily Volume", "Cumulative Performance"])
 
             with tab1:
                 fig_daily = px.line(
-                    daily_sales, 
-                    x=x_axis_col, 
-                    y='daily_sales', 
-                    color='campaign_year',
-                    markers=True,
-                    title=f"Total Sales per Day {title_suffix}",
-                    labels={x_axis_col: x_label, 'daily_sales': 'Number of Sales', 'campaign_year': 'Year'}
-                )
+                daily_sales.sort_values(x_axis_col), # Sorting is crucial for line charts!
+                x=x_axis_col, 
+                y='daily_sales', 
+                color='campaign_year',
+                markers=True,
+                title=f"Total Sales Velocity {title_suffix}",
+                labels={x_axis_col: x_label, 'daily_sales': 'Number of Sales', 'campaign_year': 'Year'}
+)
+                
                 if align_dates:
                     fig_daily.update_xaxes(tickformat="%b %d") # Format as Month-Day
                 st.plotly_chart(fig_daily, use_container_width=True)
