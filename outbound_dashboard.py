@@ -133,7 +133,8 @@ if uploaded_file is not None:
             if align_dates:
                 # Create a dummy year (e.g., 2020) to overlay plots
                 # Logic: Keep Month/Day, replace Year. Handle Leap years if needed (ignoring for simplicity)
-                daily_sales['plot_date'] = daily_sales['plan_close_dt'].apply(lambda x: x.replace(year=2020))
+                daily_sales['plot_date'] = daily_sales['plan_close_dt'].apply(
+                lambda x: x.replace(year=2021) if x.month < 7 else x.replace(year=2020))
                 x_axis_col = 'plot_date'
                 x_label = 'Date (Month-Day)'
                 title_suffix = "(Aligned by Month-Day)"
