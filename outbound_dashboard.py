@@ -17,6 +17,7 @@ def load_data(file):
     # Cleaning & Type Conversion
     df['plan_close_dt'] = pd.to_datetime(df['plan_close_dt'], errors='coerce')
     df['order_dt'] = pd.to_datetime(df['order_dt'], errors='coerce')
+    df['campaign_start_dt'] = pd.to_datetime(df['campaign_start_dt'], errors='coerce')
     df['close_date'] = df['plan_close_dt'].dt.date
     df['days_to_plan_close'] = pd.to_numeric(df['days_to_plan_close'], errors='coerce')
     
@@ -130,11 +131,12 @@ if uploaded_file is not None:
                 align_dates = st.checkbox("Align Dates for Overlay Comparison", value=False, 
                                           help="Overlays different years on a shared timeline (Month-Day) to compare seasonality.")
 
-            # 1. Calculate the start date for each campaign
-            campaign_starts = daily_sales.groupby('campaign_year')['plan_close_dt'].transform('min')
+            # 1. Get the campaign start date for each year from the data
+            campaign_start_dates = filtered_df.groupby('campaign_year')['campaign_start_dt'].first()
+            daily_sales = daily_sales.merge(campaign_start_dates.rename('campaign_start_dt'), left_on='campaign_year', right_index=True)
 
-        # 2. Calculate "Day of Campaign" (integer)
-            daily_sales['day_of_campaign'] = (daily_sales['plan_close_dt'] - campaign_starts).dt.days
+        # 2. Calculate "Day of Campaign" (integer) using the campaign start date column
+            daily_sales['day_of_campaign'] = (daily_sales['plan_close_dt'] - daily_sales['campaign_start_dt']).dt.days
 
             if align_dates:
                 x_axis_col = 'day_of_campaign'
